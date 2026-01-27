@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ケアプラン作成支援ツール</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <header class="app-header">
+            <h1>ケアプラン作成支援ツール</h1>
+            <button id="settingsBtn" class="icon-btn" title="設定">⚙️</button>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main id="mainContent">
+            <!-- ホーム画面 -->
+            <div id="homeScreen" class="screen active">
+                <div class="home-description">
+                    <p>包括的自立支援プログラムに基づくアセスメントを行い、<br>
+                        施設サービス計画書(2)の文言をAIが自動生成します。</p>
+                </div>
+                <div class="home-buttons">
+                    <button id="newAssessmentBtn" class="primary-btn">新規アセスメント開始</button>
+                    <button id="patientListBtn" class="secondary-btn">利用者一覧</button>
+                </div>
+            </div>
+
+            <!-- 利用者一覧画面 -->
+            <div id="patientListScreen" class="screen">
+                <div class="screen-header">
+                    <button class="back-btn" onclick="showScreen('homeScreen')">← 戻る</button>
+                    <h2>利用者一覧</h2>
+                </div>
+                <div id="patientList" class="patient-list"></div>
+                <button id="addPatientBtn" class="fab-btn">＋</button>
+            </div>
+
+            <!-- 利用者登録画面 -->
+            <div id="patientEntryScreen" class="screen">
+                <div class="screen-header">
+                    <button class="back-btn" onclick="showScreen('patientListScreen')">← 戻る</button>
+                    <h2>利用者登録</h2>
+                </div>
+                <form id="patientForm" class="form">
+                    <div class="form-group">
+                        <label for="patientName">氏名</label>
+                        <input type="text" id="patientName" required placeholder="例：山田 太郎">
+                    </div>
+                    <div class="form-group">
+                        <label for="patientAge">年齢</label>
+                        <input type="number" id="patientAge" placeholder="例：85">
+                    </div>
+                    <div class="form-group">
+                        <label for="careLevel">要介護度</label>
+                        <select id="careLevel">
+                            <option value="">選択してください</option>
+                            <option value="要支援1">要支援1</option>
+                            <option value="要支援2">要支援2</option>
+                            <option value="要介護1">要介護1</option>
+                            <option value="要介護2">要介護2</option>
+                            <option value="要介護3">要介護3</option>
+                            <option value="要介護4">要介護4</option>
+                            <option value="要介護5">要介護5</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="primary-btn">登録する</button>
+                </form>
+            </div>
+
+            <!-- アセスメント入力画面 -->
+            <div id="assessmentScreen" class="screen">
+                <div class="screen-header">
+                    <button class="back-btn" onclick="confirmBackToHome()">← 戻る</button>
+                    <h2>アセスメント入力</h2>
+                </div>
+                <div class="tabs" id="categoryTabs"></div>
+                <div id="assessmentContent" class="assessment-content"></div>
+                <div class="screen-footer">
+                    <button id="viewCarePlanBtn" class="primary-btn hidden">計画書を表示</button>
+                </div>
+            </div>
+
+            <!-- 計画書表示画面 -->
+            <div id="carePlanScreen" class="screen">
+                <div class="screen-header">
+                    <button class="back-btn" onclick="showScreen('assessmentScreen')">← 戻る</button>
+                    <h2>施設サービス計画書（２）</h2>
+                </div>
+                <div id="carePlanContent" class="careplan-content"></div>
+                <div class="screen-footer">
+                    <button id="addMoreBtn" class="secondary-btn">アセスメントを追加</button>
+                    <button id="saveCarePlanBtn" class="primary-btn">保存する</button>
+                </div>
+            </div>
+
+            <!-- 設定画面 -->
+            <div id="settingsScreen" class="screen">
+                <div class="screen-header">
+                    <button class="back-btn" onclick="showScreen('homeScreen')">← 戻る</button>
+                    <h2>設定</h2>
+                </div>
+                <form id="settingsForm" class="form">
+                    <div class="form-group">
+                        <label for="apiKey">Gemini API キー</label>
+                        <input type="password" id="apiKey" placeholder="APIキーを入力">
+                        <p class="hint">
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>
+                            でAPIキーを取得してください
+                        </p>
+                    </div>
+                    <button type="submit" class="primary-btn">保存</button>
+                </form>
+            </div>
+        </main>
+
+        <!-- ローディング -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>AIが文言を生成中...</p>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
