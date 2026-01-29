@@ -702,6 +702,87 @@ function saveCarePlan() {
 }
 
 // ========================================
+// コピー・エクスポート機能
+// ========================================
+function copyAllToClipboard() {
+    if (carePlanItems.length === 0) {
+        alert('コピーする項目がありません');
+        return;
+    }
+
+    let text = '【施設サービス計画書（第2表）】\n\n';
+
+    carePlanItems.forEach((item, index) => {
+        text += `■ ${index + 1}. ${item.categoryName}\n`;
+        text += `【ニーズ】${item.needs}\n`;
+        text += `【長期目標】${item.longTermGoal}\n`;
+        text += `【短期目標】${item.shortTermGoal}\n`;
+        text += `【サービス内容】${item.serviceContent}\n\n`;
+    });
+
+    navigator.clipboard.writeText(text).then(() => {
+        alert('計画書をクリップボードにコピーしました！\nWordやメモ帳に貼り付けできます。');
+    }).catch(err => {
+        // フォールバック: テキストエリアを使用
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('計画書をクリップボードにコピーしました！');
+    });
+}
+
+function exportToCSV() {
+    if (carePlanItems.length === 0) {
+        alert('出力する項目がありません');
+        return;
+    }
+
+    // BOM付きUTF-8でExcelでも文字化けしないように
+    const BOM = '\uFEFF';
+
+    // ヘッダー行
+    let csv = 'No.,カテゴリ,ニーズ,長期目標,短期目標,サービス内容\n';
+
+    // データ行
+    carePlanItems.forEach((item, index) => {
+        const row = [
+            index + 1,
+            escapeCSV(item.categoryName),
+            escapeCSV(item.needs),
+            escapeCSV(item.longTermGoal),
+            escapeCSV(item.shortTermGoal),
+            escapeCSV(item.serviceContent)
+        ];
+        csv += row.join(',') + '\n';
+    });
+
+    // ダウンロード
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ケアプラン_${new Date().toLocaleDateString('ja-JP').replace(/\//g, '-')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    alert('CSVファイルをダウンロードしました！\nExcelやスプレッドシートで開けます。');
+}
+
+function escapeCSV(str) {
+    if (!str) return '';
+    // カンマ、改行、ダブルクォートを含む場合はダブルクォートで囲む
+    if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+}
+
+// ========================================
 // ローカルストレージ操作
 // ========================================
 function getPatients() {

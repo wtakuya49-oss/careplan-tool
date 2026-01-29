@@ -92,9 +92,11 @@
                     <h2>施設サービス計画書（２）</h2>
                 </div>
                 <div id="carePlanContent" class="careplan-content"></div>
-                <div class="screen-footer">
-                    <button id="addMoreBtn" class="secondary-btn">アセスメントを追加</button>
-                    <button id="saveCarePlanBtn" class="primary-btn">保存する</button>
+                <div class="screen-footer export-footer">
+                    <button id="copyAllBtn" class="secondary-btn" onclick="copyAllToClipboard()">📋 コピー</button>
+                    <button id="exportCsvBtn" class="secondary-btn" onclick="exportToCSV()">📄 CSV出力</button>
+                    <button id="addMoreBtn" class="secondary-btn" onclick="showScreen('assessmentScreen')">➕ 追加</button>
+                    <button id="saveCarePlanBtn" class="primary-btn" onclick="saveCarePlan()">💾 保存</button>
                 </div>
             </div>
 
