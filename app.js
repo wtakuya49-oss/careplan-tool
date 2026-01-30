@@ -251,6 +251,9 @@ function renderAssessmentContent() {
                     ${savedData.checkedItems.length === 0 ? 'disabled' : ''}>
                 ${generatedPlan ? '🔄 再生成する' : '✨ この項目を生成する'}
             </button>
+            <button id="generateAllBtn" class="generate-all-btn" onclick="generateFromAllCategories()">
+                🌟 すべてから統合生成 <span id="checkedCategoryCount">(${getCheckedCategoryCount()}項目)</span>
+            </button>
         </div>
     `;
 }
@@ -277,6 +280,18 @@ function updateGenerateButton() {
     });
 
     btn.disabled = !hasChecked;
+}
+
+// チェック済みカテゴリの数を取得
+function getCheckedCategoryCount() {
+    let count = 0;
+    CATEGORIES.forEach(cat => {
+        const data = assessmentData[cat.id];
+        if (data && data.checkedItems && data.checkedItems.length > 0) {
+            count++;
+        }
+    });
+    return count;
 }
 
 // ========================================
@@ -325,6 +340,184 @@ function deleteGeneratedPlan(categoryId) {
         generateCategoryTabs();
         renderAssessmentContent();
         updateViewCarePlanButton();
+    }
+}
+
+// ========================================
+// 統合計画書生成
+// ========================================
+async function generateFromAllCategories() {
+    saveCurrentCategoryData();
+
+    // チェック済みカテゴリを収集
+    const checkedCategories = [];
+    CATEGORIES.forEach(cat => {
+        const data = assessmentData[cat.id];
+        if (data && data.checkedItems && data.checkedItems.length > 0) {
+            checkedCategories.push({
+                id: cat.id,
+                name: cat.name,
+                checkedItems: data.checkedItems,
+                detailText: data.detailText || ''
+            });
+        }
+    });
+
+    if (checkedCategories.length === 0) {
+        alert('少なくとも1つのカテゴリでチェックを入れてください');
+        return;
+    }
+
+    if (checkedCategories.length === 1) {
+        if (!confirm('1つのカテゴリのみチェックされています。\n統合生成ではなく「この項目を生成する」の使用をお勧めしますが、続けますか？')) {
+            return;
+        }
+    }
+
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+        if (confirm('Gemini APIキーが設定されていません。設定画面を開きますか？')) {
+            showScreen('settingsScreen');
+        }
+        return;
+    }
+
+    showCategoryLoading(true);
+
+    try {
+        const results = await callGeminiAPIForIntegrated(checkedCategories, apiKey);
+
+        // 結果をcarePlanItemsに追加
+        results.forEach(item => {
+            carePlanItems.push(item);
+        });
+
+        // 計画書画面に遷移
+        showScreen('carePlanScreen');
+        renderCarePlan();
+
+        alert(`${results.length}件の統合計画書を生成しました！`);
+    } catch (error) {
+        alert('統合生成に失敗しました: ' + error.message);
+    } finally {
+        showCategoryLoading(false);
+    }
+}
+
+async function callGeminiAPIForIntegrated(categories, apiKey) {
+    const prompt = buildIntegratedPrompt(categories);
+
+    console.log('統合プロンプト:', prompt);
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    temperature: 0.7,
+                    maxOutputTokens: 8192
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('APIエラー:', errorText);
+            throw new Error('API呼び出しに失敗しました');
+        }
+
+        const result = await response.json();
+        const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        return parseIntegratedResponse(text, categories);
+    } catch (error) {
+        console.error('統合生成エラー:', error);
+        throw error;
+    }
+}
+
+function buildIntegratedPrompt(categories) {
+    let categoryInfo = categories.map((cat, index) => {
+        return `【カテゴリ${index + 1}: ${cat.name}】
+・課題項目: ${cat.checkedItems.join('、')}
+${cat.detailText ? `・具体的内容: ${cat.detailText}` : ''}`;
+    }).join('\n\n');
+
+    return `あなたは介護施設のベテランケアマネジャーです。以下の複数カテゴリのアセスメント情報を統合的に分析し、施設サービス計画書（第2表）を作成してください。
+
+【アセスメント情報】
+${categoryInfo}
+
+【作成のポイント】
+1. すべてのカテゴリの情報を統合的に分析してください
+2. 関連性のある課題は、共通のニーズ・長期目標でまとめてください
+   - 例：排泄と基本動作が関連している場合は同じニーズにする
+   - 関連がないものは別のニーズ・長期目標にする
+3. ニーズと長期目標の組み合わせは自由に判断してください
+   - 同じニーズで違う長期目標もOK
+   - 違うニーズで同じ長期目標もOK
+4. 各カテゴリごとに短期目標とサービス内容を設定してください
+5. 長期目標・短期目標は55文字以内で「〜〜できる」で終わる文章にしてください
+
+【出力形式】
+以下のJSON配列形式で、カテゴリ数と同じ${categories.length}件のオブジェクトを返してください：
+[
+  {
+    "categoryName": "カテゴリ名",
+    "needs": "ニーズの文言（関連カテゴリは同じニーズにする）",
+    "longTermGoal": "長期目標（55文字以内、〜〜できるで終わる）",
+    "shortTermGoal": "短期目標（55文字以内、〜〜できるで終わる）",
+    "serviceContent": "サービス内容"
+  },
+  ...
+]`;
+}
+
+function parseIntegratedResponse(text, categories) {
+    console.log('統合レスポンス:', text);
+
+    try {
+        // コードブロックを除去
+        let cleanedText = text
+            .replace(/```json\s*/gi, '')
+            .replace(/```\s*/g, '')
+            .trim();
+
+        // JSON配列を抽出
+        const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (Array.isArray(parsed)) {
+                return parsed.map(item => ({
+                    categoryName: item.categoryName || '不明',
+                    needs: item.needs || '',
+                    longTermGoal: item.longTermGoal || '',
+                    shortTermGoal: item.shortTermGoal || '',
+                    serviceContent: item.serviceContent || ''
+                }));
+            }
+        }
+
+        // パース失敗時はフォールバック
+        console.error('統合レスポンスのパースに失敗');
+        return categories.map(cat => ({
+            categoryName: cat.name,
+            needs: '統合分析に基づくニーズ',
+            longTermGoal: '適切なケアを受けて安心して生活できる',
+            shortTermGoal: '日常生活の課題を改善できる',
+            serviceContent: '個別のケアプランに基づくサービス提供'
+        }));
+    } catch (error) {
+        console.error('パースエラー:', error);
+        return categories.map(cat => ({
+            categoryName: cat.name,
+            needs: '統合分析に基づくニーズ',
+            longTermGoal: '適切なケアを受けて安心して生活できる',
+            shortTermGoal: '日常生活の課題を改善できる',
+            serviceContent: '個別のケアプランに基づくサービス提供'
+        }));
     }
 }
 
